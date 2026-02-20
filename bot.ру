@@ -1,0 +1,50 @@
+import asyncio
+import logging
+import os
+import aiosqlite
+from datetime import datetime, timedelta
+from aiogram import Bot, Dispatcher, F
+from aiogram.types import *
+from aiogram.filters import Command
+
+TOKEN = os.getenv("TOKEN")
+ADMIN_ID = int(os.getenv("ADMIN_ID"))
+
+bot = Bot(TOKEN)
+dp = Dispatcher()
+
+async def init_db():
+    async with aiosqlite.connect("academy.db") as db:
+        await db.execute("""
+        CREATE TABLE IF NOT EXISTS users(
+            user_id INTEGER PRIMARY KEY,
+            subscription_until TEXT
+        )
+        """)
+        await db.commit()
+
+def main_menu():
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="📚 Урок", callback_data="lesson")],
+        [InlineKeyboardButton(text="💳 Подписка 30 дней", callback_data="pay")]
+    ])
+
+@dp.message(Command("start"))
+async def start(message: Message):
+    async with aiosqlite.connect("academy.db") as db:
+        await db.execute("INSERT OR IGNORE INTO users (user_id) VALUES (?)", (message.from_user.id,))
+        await db.commit()
+
+    await message.answer("Добро пожаловать 🇬🇧", reply_markup=main_menu())
+
+@dp.callback_query(F.data == "lesson")
+async def lesson(callback: CallbackQuery):
+    await callback.message.edit_text("Это ваш урок по Present Simple 📘", reply_markup=main_menu())
+
+async def main():
+    logging.basicConfig(level=logging.INFO)
+    await init_db()
+    await dp.start_polling(bot)
+
+if name == "main":
+    asyncio.run(main())
